@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SóNós</title>
+
+<!--
+  ===========================================================
+  SóNós — Fase 2: mensagens de verdade entre dois aparelhos
+  ===========================================================
+  Esta versão usa o Firebase Realtime Database para sincronizar
+  mensagens entre você e ela em tempo real. Pra isso funcionar
+  você precisa fazer 3 coisas (instruções completas no chat):
+
+  1) Criar um projeto Firebase gratuito + Realtime Database
+  2) Colar a configuração do seu projeto em FIREBASE_CONFIG abaixo
+  3) Hospedar este arquivo em algum lugar acessível pela internet
+     (ex: GitHub Pages) — sem isso não dá pra "compartilhar um link"
+
+  IMPORTANTE SOBRE PRIVACIDADE:
+  As mensagens NÃO são criptografadas ponta a ponta. Quem tiver
+  o link exato da sala consegue ler. Por isso o ID da sala é
+  longo e aleatório — trate o link como uma senha: mande só por
+  um canal de confiança, não publique em lugar nenhum.
+  ===========================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg-deep: #110c1b;
+    --bg-card: #1a1428;
+    --bg-elevated: #221b35;
+    --bg-bubble-received: #271f3e;
+    --accent: #ff7a8a;
+    --accent-2: #ffb37a;
+    --teal: #5fd9c4;
+    --text: #f4eefc;
+    --text-muted: #978dba;
+    --border: rgba(255,255,255,0.07);
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family: var(--font-body);
+    background:
+      radial-gradient(circle at 20% 0%, #2a1f44 0%, transparent 55%),
+      radial-gradient(circle at 85% 100%, #241a3a 0%, transparent 50%),
+      var(--bg-deep);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+  }
+
+  .phone{
+    width:100%;
+    max-width: 420px;
+    height: 88vh;
+    max-height: 820px;
+    background: var(--bg-card);
+    border-radius: 28px;
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- tela de criação de sala ---------- */
+
+  .setup{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding: 28px 26px;
+    gap: 16px;
+  }
+
+  .setup .wordmark{
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 22px;
+    color: var(--text);
+  }
+
+  .setup p{
+    color: var(--text-muted);
+    font-size: 13.5px;
+    line-height:1.5;
+    margin: 0;
+  }
+
+  .setup .warn{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-2);
+    background: rgba(255,179,122,0.08);
+    border: 1px solid rgba(255,179,122,0.2);
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .btn{
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color:#1a1020;
+    border:none;
+    font-family: var(--font-body);
+    font-weight:600;
+    font-size:14px;
+    padding: 13px 18px;
+    border-radius: 100px;
+    cursor:pointer;
+  }
+  .btn:active{ transform: scale(0.98); }
+
+  .link-block{ display:none; flex-direction:column; gap:10px; margin-top:6px; }
+  .link-block.show{ display:flex; }
+
+  .link-row label{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color: var(--text-muted);
+    display:block;
+    margin-bottom:5px;
+  }
+  .link-row{
+    display:flex;
+    gap:6px;
+  }
+  .link-row input{
+    flex:1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 10px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .copy-btn{
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 12px;
+    cursor:pointer;
+  }
+
+  /* ---------- cabeçalho do chat ---------- */
+
+  .chat-app{ display:none; flex-direction:column; height:100%; }
+  .chat-app.show{ display:flex; }
+
+  .brand-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 14px 18px 8px;
+  }
+  .wordmark-sm{
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-muted);
+  }
+  .privacy-pill{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    padding: 4px 9px;
+    border-radius: 100px;
+  }
+
+  .chat-header{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding: 6px 18px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .avatar{
+    width:44px; height:44px; border-radius:50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-display); font-weight:600; color:#1a1020;
+    flex-shrink:0; position:relative;
+  }
+  .status-dot{
+    position:absolute; bottom:1px; right:1px;
+    width:11px; height:11px; border-radius:50%;
+    background: var(--teal); border: 2px solid var(--bg-card);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(95,217,196,0.5); }
+    50%{ box-shadow:0 0 0 4px rgba(95,217,196,0); }
+  }
+  .contact-name{ font-family: var(--font-display); font-weight:600; font-size:17px; color: var(--text); }
+  .contact-status{ font-size:12px; color: var(--teal); margin-top:2px; }
+
+  /* ---------- mensagens ---------- */
+
+  .messages{
+    flex:1; overflow-y:auto; padding: 18px 16px;
+    display:flex; flex-direction:column; gap:10px;
+    background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .empty-state{
+    margin:auto; text-align:center; color: var(--text-muted); font-size:13px; max-width:220px;
+  }
+
+  .bubble-row{ display:flex; max-width: 82%; }
+  .bubble-row.me{ align-self:flex-end; justify-content:flex-end; }
+  .bubble-row.them{ align-self:flex-start; }
+
+  .bubble{
+    padding: 9px 13px 7px; border-radius: 18px; font-size: 14.5px; line-height:1.4;
+    animation: pop-in 0.18s ease-out;
+  }
+  @keyframes pop-in{ from{opacity:0; transform:translateY(6px) scale(0.98);} to{opacity:1; transform:translateY(0) scale(1);} }
+
+  .bubble-row.me .bubble{
+    background: linear-gradient(135deg, var(--accent), #ff6f7d);
+    color: #1f0c12; border-bottom-right-radius: 5px;
+  }
+  .bubble-row.them .bubble{
+    background: var(--bg-bubble-received); color: var(--text); border-bottom-left-radius: 5px;
+  }
+
+  .meta-row{ display:flex; align-items:center; gap:4px; margin-top:3px; }
+  .time{ font-family: var(--font-mono); font-size: 10px; opacity:0.65; }
+  .ticks{ font-size: 11px; letter-spacing:-1px; color: rgba(20,8,12,0.55); }
+  .ticks.read{ color: #0d6b5e; }
+
+  /* ---------- entrada de texto ---------- */
+
+  .input-area{
+    display:flex; align-items:center; gap:10px; padding: 12px 14px;
+    border-top: 1px solid var(--border); background: var(--bg-elevated);
+  }
+  #messageInput{
+    flex:1; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    border-radius: 100px; padding: 11px 16px; color: var(--text);
+    font-family: var(--font-body); font-size: 14px; outline:none;
+  }
+  #messageInput::placeholder{ color: var(--text-muted); }
+  #messageInput:focus{ border-color: var(--accent); }
+  #sendBtn{
+    width:40px; height:40px; border-radius:50%; border:none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  #sendBtn:active{ transform: scale(0.9); }
+  #sendBtn svg{ width:17px; height:17px; }
+
+  .messages::-webkit-scrollbar{ width:6px; }
+  .messages::-webkit-scrollbar-thumb{ background: rgba(255,255,255,0.1); border-radius:10px; }
+
+  @media (max-width: 460px){
+    body{ padding:0; }
+    .phone{ max-width:100%; height:100vh; max-height:none; border-radius:0; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="phone">
+
+    <!-- ===== tela 1: criar/entrar na sala ===== -->
+    <div class="setup" id="setupScreen">
+      <span class="wordmark">SóNós</span>
+      <p>Crie sua sala privada. Você vai receber dois links — um pra você, outro pra ela.</p>
+      <div class="warn">⚠️ Isso só funciona se este arquivo estiver hospedado num site (GitHub Pages, por ex). Rodando direto do seu computador, o link não abre no celular dela.</div>
+
+      <button class="btn" id="createRoomBtn">Criar sala agora</button>
+
+      <div class="link-block" id="linkBlock">
+        <div class="link-row">
+          <div style="flex:1">
+            <label>Seu link</label>
+            <input type="text" id="linkMe" readonly>
+          </div>
+          <button class="copy-btn" data-target="linkMe">copiar</button>
+        </div>
+        <div class="link-row">
+          <div style="flex:1">
+            <label>Link dela</label>
+            <input type="text" id="linkPartner" readonly>
+          </div>
+          <button class="copy-btn" data-target="linkPartner">copiar</button>
+        </div>
+        <button class="btn" id="enterChatBtn">Entrar no chat agora</button>
+      </div>
+    </div>
+
+    <!-- ===== tela 2: chat conectado ===== -->
+    <div class="chat-app" id="chatApp">
+      <div class="brand-row">
+        <span class="wordmark-sm">SóNós</span>
+        <span class="privacy-pill">🔒 sala privada</span>
+      </div>
+      <div class="chat-header">
+        <div class="avatar" id="avatar">
+          ? <span class="status-dot"></span>
+        </div>
+        <div>
+          <div class="contact-name" id="partnerNameLabel">—</div>
+          <div class="contact-status">conectado em tempo real</div>
+        </div>
+      </div>
+      <div class="messages" id="messages">
+        <div class="empty-state">Ainda não tem mensagens aqui. Manda um "oi" 👋</div>
+      </div>
+      <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Escreva uma mensagem..." autocomplete="off">
+        <button id="sendBtn" aria-label="Enviar">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3 11.5L20 4L13 21L11 13L3 11.5Z" stroke="#1a1020" stroke-width="1.8" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getDatabase, ref, push, onChildAdded, onChildChanged, update
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // =========================================================
+  // PERSONALIZE AQUI 👇
+  // =========================================================
+
+  // Cole aqui a configuração que o Firebase te der
+  // (Configurações do projeto > Seus apps > SDK config)
+  const FIREBASE_CONFIG = {
+    apiKey: "COLE_AQUI",
+    authDomain: "SEU-PROJETO.firebaseapp.com",
+    databaseURL: "https://SEU-PROJETO-default-rtdb.firebaseio.com",
+    projectId: "SEU-PROJETO",
+    storageBucket: "SEU-PROJETO.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "SEU_APP_ID"
+  };
+
+  const ME_NAME = "Você";       // troque pelo seu nome
+  const PARTNER_NAME = "Amor";  // troque pelo nome dela
+
+  // =========================================================
+
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = getDatabase(app);
+
+  const params = new URLSearchParams(location.search);
+  let roomId = params.get('room');
+  let myRole = params.get('as'); // 'eu' ou 'ela'
+
+  const setupScreen = document.getElementById('setupScreen');
+  const chatApp = document.getElementById('chatApp');
+
+  function makeRoomId(){
+    if (crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+    return Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('');
+  }
+
+  function baseUrl(){
+    return location.origin + location.pathname;
+  }
+
+  document.getElementById('createRoomBtn').addEventListener('click', () => {
+    const id = makeRoomId();
+    const linkMe = `${baseUrl()}?room=${id}&as=eu`;
+    const linkPartner = `${baseUrl()}?room=${id}&as=ela`;
+    document.getElementById('linkMe').value = linkMe;
+    document.getElementById('linkPartner').value = linkPartner;
+    document.getElementById('linkBlock').classList.add('show');
+    document.getElementById('enterChatBtn').onclick = () => { window.location.href = linkMe; };
+  });
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetEl = document.getElementById(btn.dataset.target);
+      targetEl.select();
+      navigator.clipboard?.writeText(targetEl.value).catch(()=>{});
+      btn.textContent = 'copiado!';
+      setTimeout(() => btn.textContent = 'copiar', 1200);
+    });
+  });
+
+  // se já veio com sala + papel definidos na URL, entra direto no chat
+  if (roomId && myRole) {
+    setupScreen.style.display = 'none';
+    chatApp.classList.add('show');
+    startChat();
+  }
+
+  function startChat(){
+    const otherName = myRole === 'eu' ? PARTNER_NAME : ME_NAME;
+    document.getElementById('partnerNameLabel').textContent = otherName;
+    document.getElementById('avatar').firstChild.textContent = otherName.charAt(0).toUpperCase() + ' ';
+
+    const messagesEl = document.getElementById('messages');
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesRef = ref(db, `rooms/${roomId}/messages`);
+
+    let messagesMap = {};
+
+    function ticksFor(status){
+      return status === 'lida'
+        ? '<span class="ticks read">✓✓</span>'
+        : '<span class="ticks">✓</span>';
+    }
+
+    function nowTime(){
+      return new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    }
+
+    function escapeHtml(str){
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function render(){
+      const list = Object.values(messagesMap).sort((a,b) => a.ts - b.ts);
+      if (list.length === 0) {
+        messagesEl.innerHTML = '<div class="empty-state">Ainda não tem mensagens aqui. Manda um "oi" 👋</div>';
+        return;
+      }
+      messagesEl.innerHTML = '';
+      list.forEach(m => {
+        const fromMe = m.sender === myRole;
+        const row = document.createElement('div');
+        row.className = 'bubble-row ' + (fromMe ? 'me' : 'them');
+        row.innerHTML = `
+          <div class="bubble">
+            ${escapeHtml(m.text)}
+            <div class="meta-row">
+              <span class="time">${m.time}</span>
+              ${fromMe ? ticksFor(m.status) : ''}
+            </div>
+          </div>`;
+        messagesEl.appendChild(row);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    onChildAdded(messagesRef, (snapshot) => {
+      const key = snapshot.key;
+      const val = snapshot.val();
+      messagesMap[key] = val;
+      // se a mensagem é dela (ou dele) e ainda não foi marcada como lida,
+      // marca agora — já que a tela está aberta e visível
+      if (val.sender !== myRole && val.status !== 'lida') {
+        update(ref(db, `rooms/${roomId}/messages/${key}`), { status: 'lida' });
+      }
+      render();
+    });
+
+    onChildChanged(messagesRef, (snapshot) => {
+      messagesMap[snapshot.key] = snapshot.val();
+      render();
+    });
+
+    function sendMessage(){
+      const text = input.value.trim();
+      if (!text) return;
+      push(messagesRef, {
+        sender: myRole,
+        text,
+        time: nowTime(),
+        ts: Date.now(),
+        status: 'enviada'
+      });
+      input.value = '';
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+  }
+</script>
+</body>
+</html>
